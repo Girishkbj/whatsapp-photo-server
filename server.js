@@ -27,7 +27,7 @@ client.initialize();
 // API route to receive photo from ESP32
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
-    const receiver = "91XXXXXXXXXX@c.us"; // ← Yahan receiver number daaliye (91 + mobile number)
+    const receiver = "919078491821@c.us"; // ← Yahan receiver number daaliye (91 + mobile number)
     const imagePath = req.file.path;
 
     console.log(`📸 Photo received: ${imagePath}`);
