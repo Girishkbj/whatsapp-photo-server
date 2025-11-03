@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "ESP32 photo uploader and WhatsApp sender",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
