@@ -1,8 +1,9 @@
 import express from "express";
 import multer from "multer";
 import qrcode from "qrcode-terminal";
-import { Client, LocalAuth } from "whatsapp-web.js";
 import fs from "fs";
+import pkg from "whatsapp-web.js";
+const { Client, LocalAuth, MessageMedia } = pkg;
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
@@ -14,7 +15,7 @@ const client = new Client({
 });
 
 client.on("qr", (qr) => {
-  console.log("Scan this QR code in your WhatsApp Web:");
+  console.log("📱 Scan this QR code in your WhatsApp Web:");
   qrcode.generate(qr, { small: true });
 });
 
@@ -24,23 +25,24 @@ client.on("ready", () => {
 
 client.initialize();
 
-// API route to receive photo from ESP32
+// API to receive image from ESP32
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
-    const receiver = "919078491821@c.us"; // ← Yahan receiver number daaliye (91 + mobile number)
+    const receiver = "91XXXXXXXXXX@c.us"; // ← yahan receiver number likhiye
     const imagePath = req.file.path;
+    const media = MessageMedia.fromFilePath(imagePath);
 
-    console.log(`📸 Photo received: ${imagePath}`);
+    console.log(`📸 Photo received from ESP32: ${imagePath}`);
 
-    await client.sendMessage(receiver, fs.readFileSync(imagePath), {
-      caption: "Motion detected! 📷",
+    await client.sendMessage(receiver, media, {
+      caption: "⚠️ Motion detected! 📷",
     });
 
-    res.send("Photo sent to WhatsApp successfully ✅");
-    fs.unlinkSync(imagePath); // remove temp file
+    res.send("✅ Photo sent to WhatsApp successfully");
+    fs.unlinkSync(imagePath);
   } catch (error) {
-    console.error("Error sending image:", error);
-    res.status(500).send("Error sending image ❌");
+    console.error("❌ Error sending image:", error);
+    res.status(500).send("Error sending image");
   }
 });
 
