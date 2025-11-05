@@ -1,35 +1,25 @@
 import express from "express";
 import multer from "multer";
-import qrcodeTerminal from "qrcode-terminal";
+import qrcode from "qrcode-terminal";
 import fs from "fs";
-import path from "path";
 import pkg from "whatsapp-web.js";
 const { Client, LocalAuth, MessageMedia } = pkg;
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
-const port = process.env.PORT || 3000;
 
 // ----- CONFIG -----
-const SECRET_KEY = "Girish7952";             // QR page access key
-const DATA_PATH  = "/data/whatsapp_session"; // Render persistent path
-const CLIENT_ID  = "ESP32CAM";               // unique session id
-const RECEIVER   = "91XXXXXXXXXX@c.us";      // <- yahan apna WhatsApp no. dalo
+const SECRET_KEY = "Girish7952";              // Your secret key
+const DATA_PATH = "./wwebjs_auth";            // ✅ Safe storage path
+const CLIENT_ID = "ESP32CAM";                 // Unique client ID
+const RECEIVER = "91XXXXXXXXXX@c.us";         // ← replace with your WhatsApp number
 // -------------------
 
-// ensure /data path exists (Render)
-try {
-  fs.mkdirSync(DATA_PATH, { recursive: true });
-} catch {}
-
-// keep latest QR in memory for the web page
-let latestQR = "";
-
-// Lightweight LocalAuth + headless puppeteer (Render safe)
+// WhatsApp Client Setup
 const client = new Client({
   authStrategy: new LocalAuth({
     clientId: CLIENT_ID,
-    dataPath: DATA_PATH,
+    dataPath: DATA_PATH
   }),
   puppeteer: {
     headless: true,
@@ -37,116 +27,76 @@ const client = new Client({
   },
 });
 
-// QR events
+// QR EVENT
 client.on("qr", (qr) => {
-  latestQR = qr;
-  console.log("📱 Scan this QR code in your WhatsApp Web:");
-  qrcodeTerminal.generate(qr, { small: true }); // console fallback
+  console.log("\n📱 Scan QR on secret URL only:");
+  console.log(`🔐 Open: /qr?key=${SECRET_KEY}`);
+  qrcode.generate(qr, { small: true });
 });
 
+// READY EVENT
 client.on("ready", () => {
-  console.log("✅ WhatsApp client is ready!");
+  console.log("✅ WhatsApp is Ready!");
 });
 
-client.on("auth_failure", (m) => {
-  console.error("❌ Auth failure:", m);
+// ERROR EVENT
+client.on("auth_failure", () => {
+  console.log("❌ Auth Failure. Scan QR again.");
 });
 
+// INIT
 client.initialize();
 
-// ---------- WEB ROUTES ----------
-
-// health/root
-app.get("/", (_req, res) => {
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.end(`
-    <h2>WhatsApp Photo Server</h2>
-    <p>Status: running on port ${port}</p>
-    <p>QR page (secret key required): <code>/qr?key=YOUR_SECRET</code></p>
-  `);
-});
-
-// secure QR page: /qr?key=Girish7952
+// ✅ Secret QR Page
 app.get("/qr", (req, res) => {
-  const key = req.query.key;
-  if (key !== SECRET_KEY) {
-    return res.status(403).send("Forbidden: invalid or missing key.");
-  }
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  // client-side QR renderer via CDN (no extra npm deps)
-  res.end(`
-<!doctype html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WhatsApp QR</title>
-  <style>
-    body { font-family: system-ui, sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0b1320; color:#fff; margin:0; }
-    .card { background:#121a2b; padding:24px; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35); text-align:center; width:min(92vw,420px); }
-    #qrcode { background:#fff; padding:12px; border-radius:12px; }
-    .muted { opacity:.8; font-size:14px; margin-top:10px; }
-    button { margin-top:14px; padding:10px 14px; border:0; border-radius:8px; background:#1f6feb; color:#fff; cursor:pointer; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h2>Scan this QR in WhatsApp</h2>
-    <div id="qrcode"></div>
-    <div class="muted">WhatsApp &gt; Linked devices &gt; Link a device</div>
-    <button onclick="refresh()">Refresh QR</button>
-  </div>
+  if (req.query.key !== SECRET_KEY) return res.status(403).send("❌ Unauthorized");
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script>
-    async function getQR() {
-      const r = await fetch('/qr/raw?key=${SECRET_KEY}&t=' + Date.now());
-      if (!r.ok) return null;
-      return r.text();
-    }
-    async function render() {
-      const qr = await getQR();
-      const box = document.getElementById('qrcode');
-      box.innerHTML = '';
-      if (!qr || qr.trim()==='') {
-        box.innerHTML = '<div style="padding:20px;color:#ffb4b4">QR not available. If already scanned, wait for "client ready".</div>';
-        return;
-      }
-      new QRCode(box, { text: qr, width: 320, height: 320 });
-    }
-    function refresh(){ render(); }
-    render();
-  </script>
-</body>
-</html>
+  res.send(`
+    <h2>🔐 Secure QR Login</h2>
+    <p>Scan this QR in WhatsApp App → Linked Devices</p>
+    <script>
+      const eventSource = new EventSource('/qr-stream?key=${SECRET_KEY}');
+      eventSource.onmessage = (e) => {
+        document.body.innerHTML = "<img src='" + e.data + "' />";
+      };
+    </script>
   `);
 });
 
-// raw QR string for the page (secured)
-app.get("/qr/raw", (req, res) => {
-  const key = req.query.key;
-  if (key !== SECRET_KEY) return res.status(403).end();
-  res.type("text/plain").send(latestQR || "");
+// ✅ QR Stream (Image)
+app.get("/qr-stream", (req, res) => {
+  if (req.query.key !== SECRET_KEY) return res.status(403).send("Unauthorized");
+
+  res.setHeader("Content-Type", "text/event-stream");
+
+  client.on("qr", async (qr) => {
+    const qrImage = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + qr;
+    res.write(`data: ${qrImage}\n\n`);
+  });
 });
 
-// API to receive image from ESP32
+// ✅ ESP32 Upload API
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
-    const imagePath = req.file?.path;
-    if (!imagePath) return res.status(400).send("No image file received");
+    const imagePath = req.file.path;
     const media = MessageMedia.fromFilePath(imagePath);
 
-    console.log(`📸 Photo from ESP32: ${imagePath}`);
-    await client.sendMessage(RECEIVER, media, { caption: "⚠️ Motion detected! 📷" });
+    console.log(`📸 Photo received: ${imagePath}`);
 
-    res.send("✅ Photo sent to WhatsApp successfully");
-    fs.unlink(imagePath, () => {}); // cleanup
+    await client.sendMessage(RECEIVER, media, {
+      caption: "⚠️ Motion Detected!",
+    });
+
+    fs.unlinkSync(imagePath); // Delete after send
+    res.send("✅ Image Sent on WhatsApp");
   } catch (err) {
     console.error("❌ Error sending image:", err);
-    res.status(500).send("Error sending image");
+    res.status(500).send("Error");
   }
 });
 
-// start server
+// ------------------- RUN SERVER -------------------
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
 });
