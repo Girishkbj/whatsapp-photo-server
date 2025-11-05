@@ -1,0 +1,35 @@
+name: Unzip WhatsApp Auth
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  unzip-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Unzip auth file if exists
+        run: |
+          if [ -f "wwebjs_auth.zip" ]; then
+            echo "Found wwebjs_auth.zip, extracting..."
+            unzip wwebjs_auth.zip -d .wwebjs_auth
+            echo "✅ Extracted to .wwebjs_auth folder"
+          else
+            echo "No wwebjs_auth.zip found, skipping..."
+          fi
+
+      - name: Commit unzipped folder
+        run: |
+          if [ -d ".wwebjs_auth" ]; then
+            git config --local user.email "actions@github.com"
+            git config --local user.name "GitHub Actions"
+            git add .wwebjs_auth
+            git commit -m "Auto-extracted WhatsApp auth"
+            git push
+            echo "✅ Auth folder pushed to repo"
+          else
+            echo "No auth folder to push"
+          fi
