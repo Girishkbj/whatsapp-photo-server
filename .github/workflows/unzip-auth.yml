@@ -11,6 +11,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Install unzip
+        run: sudo apt-get install unzip -y
+
       - name: Unzip auth file if exists
         run: |
           if [ -f "wwebjs_auth.zip" ]; then
