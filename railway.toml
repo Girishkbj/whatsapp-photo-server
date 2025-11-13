@@ -1,0 +1,5 @@
+[build]
+builder = "NIXPACKS"
+
+[env]
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "false"
